@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   digest:
-    uses: annayeet1/gigHunter/.github/workflows/digest.yml@v0.3.2
+    uses: annayeet1/gigHunter/.github/workflows/digest.yml@v0.3.3
     permissions:
       contents: write
     with:

@@ -1,2 +1,2 @@
 """gigHunter: job-board matcher, daily digest, and resume tailoring helpers."""
-__version__ = "0.3.2"
+__version__ = "0.3.3"

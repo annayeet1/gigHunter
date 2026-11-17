@@ -99,7 +99,7 @@ def load_profile(about_path: Path | None = None, params_path: Path | None = None
         name=about.get("name", ""),
         target_titles=_clean(prefs.get("target_titles")),
         years_experience=float(about.get("years_experience") or 0),
-        seniority=str(seniority).lower(),
+        seniority=[str(s).lower() for s in (seniority if isinstance(seniority, list) else [seniority])],
         work_modes=[m.lower() for m in (prefs.get("work_modes") or ["remote"])],
         locations=_clean(prefs.get("locations")),
         skills=skills,

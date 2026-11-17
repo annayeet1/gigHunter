@@ -11,8 +11,9 @@ target_titles:
   - "TODO: e.g. Software Engineer"
   - "TODO: e.g. Technical Solutions Engineer"
 
-# Level you're targeting: junior | mid | senior | staff | principal
-target_seniority: mid
+# Level(s) you're targeting: junior | mid | senior | staff | principal. One level or a range,
+# e.g. [junior, mid]. Titles without a level word ("Data Engineer") count as mid.
+target_seniority: [mid]
 
 # Where you're willing to work
 work_modes: [remote, hybrid]   # any of: remote, hybrid, onsite

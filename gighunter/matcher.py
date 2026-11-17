@@ -9,7 +9,9 @@ skills           Weighted coverage of the skills the listing asks for (that we c
                  scaled down when only a little evidence was found.
 title            Best token overlap between the listing title and any target title.
 text_similarity  Cosine similarity of aboutme.md body + JobParams.md "ideal job" text vs the listing (rescaled).
-seniority        How close the listing's level / required years is to yours.
+seniority        Listing level vs. your accepted level(s): inside the range = 1.0, one level
+                 outside = 0.6, further = 0.2. Unlabeled titles count as mid. Penalized when
+                 required years exceed yours by more than one.
 location         Remote/hybrid/onsite fit with your work_modes and locations.
 bonus            Hits on bonus_keywords (2 hits = full credit).
 
@@ -84,11 +86,11 @@ def job_level(job: Job) -> str | None:
 
 
 def score_seniority(profile: Profile, job: Job) -> float:
-    s = 0.7  # neutral when the listing gives no signal
-    lvl = job_level(job)
-    if lvl and profile.seniority in LEVELS:
-        gap = abs(LEVELS.index(lvl) - LEVELS.index(profile.seniority))
-        s = {0: 1.0, 1: 0.6}.get(gap, 0.2)
+    wanted = profile.seniority if isinstance(profile.seniority, (list, tuple)) else [profile.seniority]
+    wanted = [w for w in wanted if w in LEVELS] or ["mid"]
+    lvl = job_level(job) or "mid"          # titles without a level word are usually mid-level roles
+    gap = min(abs(LEVELS.index(lvl) - LEVELS.index(w)) for w in wanted)
+    s = {0: 1.0, 1: 0.6}.get(gap, 0.2)
     years = [int(y) for y in _YEARS.findall(job.description)[:3]]
     if years and profile.years_experience:
         need = min(years)

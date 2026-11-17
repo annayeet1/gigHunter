@@ -25,7 +25,7 @@ class Profile:
     name: str
     target_titles: list[str]
     years_experience: float
-    seniority: str
+    seniority: list[str] | str      # accepted level(s), e.g. ["junior", "mid"]
     work_modes: list[str]
     locations: list[str]
     skills: dict[str, int]       # skill -> weight 1..3

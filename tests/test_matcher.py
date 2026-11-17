@@ -46,3 +46,16 @@ def test_onsite_elsewhere_scores_location_zero():
 def test_senior_title_penalised_for_junior():
     r = score_job(prof(seniority="junior"), job(title="Senior Software Engineer"), W, ALIASES)
     assert r.breakdown["seniority"] < 1
+
+
+def test_seniority_range():
+    rng = prof(seniority=["junior", "mid"])
+    assert score_job(rng, job(title="Junior Data Engineer"), W, ALIASES).breakdown["seniority"] == 1.0
+    assert score_job(rng, job(title="Data Engineer"), W, ALIASES).breakdown["seniority"] == 1.0   # unlabeled = mid
+    assert score_job(rng, job(title="Senior Data Engineer"), W, ALIASES).breakdown["seniority"] == 0.6
+    assert score_job(rng, job(title="Principal Data Engineer"), W, ALIASES).breakdown["seniority"] == 0.2
+
+
+def test_single_level_string_still_works():
+    r = score_job(prof(seniority="senior"), job(title="Senior Data Engineer"), W, ALIASES)
+    assert r.breakdown["seniority"] == 1.0
