@@ -1,0 +1,32 @@
+# gigHunter email schedule: when the daily digest goes out and what it includes.
+# Edit, commit, push. The next hourly workflow run picks up the change.
+
+# Set to false to pause the digest without touching the workflow.
+enabled = true
+
+# IANA timezone name, e.g. "America/Chicago", "America/New_York", "America/Los_Angeles".
+timezone = "America/Chicago"
+
+# Local send time, 24-hour HH:MM. The workflow checks hourly at :55, so the email
+# arrives within roughly `early_minutes` before to ~1 hour after this time.
+# Times on the hour (e.g. "09:00") are the most precise.
+send_time = "09:00"
+
+# Which days to send. Use a list like ["Mon", "Wed", "Fri"], or "daily" / "weekdays".
+days = "daily"
+
+# Only listings scoring at or above this percent (0-100) are included.
+min_match_score = 60
+
+# At most this many listings per email (highest scores first).
+max_listings = 25
+
+# true  = send an email even when nothing new passes the threshold ("no new matches today")
+# false = skip the email on empty days
+send_when_empty = true
+
+# A run this many minutes BEFORE send_time may send (absorbs the :55 check time).
+early_minutes = 10
+
+# If GitHub delays or skips runs, still send up to this many minutes AFTER send_time.
+catch_up_minutes = 120

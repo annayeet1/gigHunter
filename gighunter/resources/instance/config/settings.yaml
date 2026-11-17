@@ -1,0 +1,16 @@
+# Overrides for the engine's defaults. List only what you change; everything else uses
+# the defaults shipped with gighunter (run `python -m gighunter config` to see the merged result).
+#
+# email:
+#   to: someone@example.com          # default: send to yourself (SMTP_USER)
+#   smtp_host: smtp.fastmail.com     # default smtp.gmail.com
+#   smtp_port: 465
+#
+# Match-score weights (must sum to 1.0). /gighunter:tune-score can set these for you.
+# weights:
+#   skills: 0.40
+#   title: 0.20
+#   text_similarity: 0.15
+#   seniority: 0.10
+#   location: 0.10
+#   bonus: 0.05

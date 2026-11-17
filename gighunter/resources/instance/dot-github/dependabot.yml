@@ -1,0 +1,10 @@
+# Opens a pull request when a new gigHunter engine version (tag) is released,
+# by bumping the @vX.Y.Z in .github/workflows/daily-digest.yml.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "engine"

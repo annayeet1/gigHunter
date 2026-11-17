@@ -1,0 +1,13 @@
+{
+  "name": "gighunter",
+  "owner": { "name": "annayeet1" },
+  "metadata": { "description": "gigHunter: job matching and honest, guideline-driven resume tailoring." },
+  "plugins": [
+    {
+      "name": "gighunter",
+      "source": "./plugin",
+      "description": "Interactive skills: build-resume, tailor (resume + cover letter per listing), tune-score.",
+      "version": "0.3.0"
+    }
+  ]
+}

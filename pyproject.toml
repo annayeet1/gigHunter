@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gighunter"
+version = "0.3.0"
+description = "Score job listings against your profile, email a daily digest, and tailor resumes with Claude Code."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+  "requests>=2.31",
+  "PyYAML>=6.0",
+  "feedparser>=6.0",
+  "beautifulsoup4>=4.12",
+  "python-docx>=1.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+gighunter = "gighunter.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["gighunter*"]
+
+[tool.setuptools.package-data]
+gighunter = ["resources/**/*", "resources/**/.gitkeep"]

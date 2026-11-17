@@ -1,0 +1,63 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  release-tag:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag must match the version in every file
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          grep -q "^version = \"$tag\"" pyproject.toml || { echo "pyproject.toml version != $tag"; exit 1; }
+          grep -q "ENGINE_REF: v$tag" .github/workflows/digest.yml || { echo "digest.yml ENGINE_REF != v$tag"; exit 1; }
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install -e ".[dev]"
+      - run: pytest -q
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Build wheel and install it outside the source tree
+        run: |
+          pip install build
+          python -m build --wheel
+          python -m venv /tmp/venv
+          /tmp/venv/bin/pip install dist/*.whl
+      - name: init from the installed wheel creates a complete workspace
+        working-directory: /tmp
+        run: |
+          /tmp/venv/bin/python -m gighunter init /tmp/ws
+          for f in aboutme.md JobParams.md config/schedule.toml config/sites.yaml \
+                   .gitignore .github/workflows/daily-digest.yml resume/.gitkeep data/seen_jobs.json; do
+            test -e "/tmp/ws/$f" || { echo "missing $f"; exit 1; }
+          done
+          cd /tmp/ws
+          /tmp/venv/bin/python -m gighunter config
+          /tmp/venv/bin/python -m gighunter guidelines | head -3
+          /tmp/venv/bin/python -m gighunter.schedule
+      - name: Schedule gate works with --no-deps (as in the user workflow)
+        run: |
+          python3 -m venv /tmp/bare
+          /tmp/bare/bin/pip install --no-deps dist/*.whl
+          cd /tmp/ws && /tmp/bare/bin/python -m gighunter.schedule

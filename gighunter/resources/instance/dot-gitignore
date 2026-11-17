@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+digest_preview.html
+~$*.docx
+data/last_scan.json

@@ -1,0 +1,32 @@
+name: daily-digest
+
+# The logic lives in the gigHunter engine (a reusable workflow). This file only says WHEN to check
+# and WHICH engine version to use. Dependabot opens a PR when a new engine version is released.
+
+on:
+  schedule:
+    # Hourly check (GitHub cron is UTC-only and can't read config).
+    # config/schedule.toml decides whether a run actually sends.
+    - cron: "55 * * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Send now, ignoring schedule.toml timing / once-per-day check"
+        type: boolean
+        default: false
+
+concurrency:
+  group: daily-digest
+  cancel-in-progress: false
+
+jobs:
+  digest:
+    uses: annayeet1/gigHunter/.github/workflows/digest.yml@v0.3.0
+    permissions:
+      contents: write
+    with:
+      force: ${{ inputs.force || false }}
+    secrets:
+      SMTP_USER: ${{ secrets.SMTP_USER }}            # your email address (login + sender)
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}    # app password (Gmail) or SMTP password
+      SMTP_TO: ${{ secrets.SMTP_TO }}                # optional recipient; default is yourself

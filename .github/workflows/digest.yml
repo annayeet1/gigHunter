@@ -1,0 +1,81 @@
+# Reusable daily-digest workflow. Workspaces call it from their own schedule:
+#
+#   jobs:
+#     digest:
+#       uses: annayeet1/gigHunter/.github/workflows/digest.yml@v0.3.0
+#       permissions: { contents: write }
+#       with: { force: false }
+#       secrets:
+#         SMTP_USER: ${{ secrets.SMTP_USER }}
+#         SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+#         SMTP_TO: ${{ secrets.SMTP_TO }}
+#
+# ENGINE_REF below MUST equal the release tag this file ships in (CI enforces it on tags),
+# so a workspace pinned to @vX.Y.Z also installs engine vX.Y.Z.
+name: digest
+
+on:
+  workflow_call:
+    inputs:
+      force:
+        description: "Send now, ignoring schedule.toml timing / once-per-day check"
+        type: boolean
+        default: false
+    secrets:
+      SMTP_USER:
+        required: false
+      SMTP_PASSWORD:
+        required: false
+      SMTP_TO:
+        required: false
+      # Legacy names (workspaces created before v0.3.0). Still accepted; SMTP_* win if both are set.
+      GMAIL_USER:
+        required: false
+      GMAIL_APP_PASSWORD:
+        required: false
+      GMAIL_TO:
+        required: false
+
+env:
+  ENGINE_REF: v0.3.0
+  ENGINE_REPO: https://github.com/annayeet1/gigHunter
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write   # commit data/ state back to the calling workspace
+    steps:
+      - uses: actions/checkout@v4   # the CALLING workspace repo
+
+      # Cheap gate: engine code only (no deps), check config/schedule.toml.
+      - name: Check schedule
+        id: gate
+        run: |
+          python3 -m pip install -q --no-deps --break-system-packages "gighunter @ git+${ENGINE_REPO}@${ENGINE_REF}"
+          python3 -m gighunter.schedule --github
+
+      - if: steps.gate.outputs.send == 'true' || inputs.force
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - if: steps.gate.outputs.send == 'true' || inputs.force
+        run: pip install -q "gighunter @ git+${ENGINE_REPO}@${ENGINE_REF}"
+      - name: Run digest
+        if: steps.gate.outputs.send == 'true' || inputs.force
+        env:
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          SMTP_TO: ${{ secrets.SMTP_TO }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          GMAIL_TO: ${{ secrets.GMAIL_TO }}
+        run: python -m gighunter digest ${{ inputs.force && '--force' || '' }}
+      - name: Commit state
+        if: steps.gate.outputs.send == 'true' || inputs.force
+        run: |
+          git config user.name "gigHunter bot"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/
+          git diff --cached --quiet || (git commit -m "Update digest state [skip ci]" && git pull --rebase && git push)

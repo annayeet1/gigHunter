@@ -1,0 +1,20 @@
+# Engine defaults. Override any key in your workspace's config/settings.yaml (only list what you change).
+# Email timing, days, and the match-score threshold live in config/schedule.toml.
+max_listing_age_days: 14      # ignore postings older than this (when the source gives a date)
+
+email:
+  to: ""                      # blank = secret SMTP_TO, else send to yourself (SMTP_USER)
+  from_name: gigHunter
+  smtp_host: smtp.gmail.com
+  smtp_port: 465
+  # Login comes from secrets SMTP_USER / SMTP_PASSWORD (legacy GMAIL_USER / GMAIL_APP_PASSWORD also work).
+  # Not using Gmail? Override smtp_host / smtp_port (implicit TLS, usually 465) in config/settings.yaml.
+
+# Match score weights (must sum to 1.0). Tune these together with the formula.
+weights:
+  skills: 0.40
+  title: 0.20
+  text_similarity: 0.15
+  seniority: 0.10
+  location: 0.10
+  bonus: 0.05

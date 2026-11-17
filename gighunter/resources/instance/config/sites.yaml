@@ -1,0 +1,32 @@
+# Job sources to scan. Every source type uses a public API or feed, so no
+# HTML scraping of sites that forbid it (LinkedIn/Indeed/Glassdoor are left out).
+#
+# type: greenhouse  -> boards.greenhouse.io/<board>        (company job boards)
+# type: lever       -> jobs.lever.co/<company>
+# type: ashby       -> jobs.ashbyhq.com/<company>
+# type: remoteok    -> remoteok.com public JSON API (optional `tags` filter)
+# type: rss         -> any RSS/Atom job feed (We Work Remotely, Hacker News "who's hiring" mirrors, etc.)
+#
+# Set enabled: false to skip a source without deleting it.
+
+sources:
+  - name: RemoteOK
+    type: remoteok
+    enabled: true
+    tags: []            # e.g. [python, dev]; empty = all
+
+  - name: We Work Remotely - Programming
+    type: rss
+    enabled: true
+    url: https://weworkremotely.com/categories/remote-programming-jobs.rss
+
+  # --- Company boards: add the companies you care about -------------------
+  # - name: Example Co
+  #   type: greenhouse
+  #   board: exampleco
+  # - name: Example Two
+  #   type: lever
+  #   company: exampletwo
+  # - name: Example Three
+  #   type: ashby
+  #   company: examplethree
