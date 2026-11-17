@@ -46,3 +46,34 @@ def test_missing_jobparams_falls_back_to_aboutme():
     with tempfile.TemporaryDirectory() as d:
         p = load_profile(_write(d, "a.md", ABOUT), Path(d) / "nope.md")
     assert p.target_titles == ["Legacy Title"] and p.seniority == "mid"
+
+
+BANNER_ABOUT = """---
+# ---------------------------------------------------------------------------
+# a banner comment full of dashes, like the real template
+# ---------------------------------------------------------------------------
+name: T
+skills:
+  sql: 3
+  python: 2
+---
+
+# About Me
+Body text --- with dashes inline.
+"""
+
+
+def test_front_matter_ignores_dashes_in_comments():
+    with tempfile.TemporaryDirectory() as d:
+        p = load_profile(_write(d, "a.md", BANNER_ABOUT), Path(d) / "none.md")
+    assert p.skills == {"sql": 3, "python": 2}
+    assert "Body text --- with dashes inline." in p.body
+
+
+def test_real_template_parses():
+    from gighunter.profile import read_front_matter
+    from gighunter.workspace import resource
+    for name in ("aboutme.md", "JobParams.md"):
+        fm, body = read_front_matter(resource("instance", name))
+        assert isinstance(fm, dict) and fm, name      # banner must not swallow the YAML
+    assert "target_titles" in read_front_matter(resource("instance", "JobParams.md"))[0]

@@ -8,6 +8,7 @@ to any preference keys still in aboutme.md, so older profiles keep working.
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import yaml
@@ -55,12 +56,20 @@ def load_sites() -> list[dict]:
     return _yaml(workspace.path("config", "sites.yaml")).get("sources", [])
 
 
+# Delimiters are lines that are exactly '---'; dashes inside comments (# -----) must not count.
+_FRONT_MATTER = re.compile(r"\A﻿?---[ \t]*\r?\n(.*?)^---[ \t]*(?:\r?\n|\Z)(.*)\Z", re.S | re.M)
+
+
 def read_front_matter(path: Path) -> tuple[dict, str]:
     text = path.read_text(encoding="utf-8")
-    if not text.startswith("---"):
-        raise ValueError(f"{path} must start with a YAML front-matter block (---)")
-    _, fm, body = text.split("---", 2)
-    return yaml.safe_load(fm) or {}, body
+    m = _FRONT_MATTER.match(text)
+    if not m:
+        raise ValueError(f"{path} must start with a YAML front-matter block: a '---' line, "
+                         "YAML, then a closing '---' line")
+    fm = yaml.safe_load(m.group(1)) or {}
+    if not isinstance(fm, dict):
+        raise ValueError(f"{path}: front matter must be YAML key: value pairs")
+    return fm, m.group(2)
 
 
 def _is_todo(x) -> bool:
