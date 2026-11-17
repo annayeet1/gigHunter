@@ -8,6 +8,7 @@
   render PATH.md                   resume/cover-letter Markdown -> ATS-friendly .docx
   extract FILE                     print the text of a .docx/.md/.txt resume
   guidelines                       print the resume/cover-letter rules
+  workflow [NAME]                  print a Claude workflow (build-resume, tailor, tune-score)
   config                           print merged settings, schedule and profile summary
   label JOB_ID strong|maybe|no     record your rating of a scanned listing
   tune [--apply]                   fit score weights to your ratings
@@ -177,6 +178,22 @@ def cmd_guidelines(a):
     print(workspace.resource("resume_guidelines.md").read_text(encoding="utf-8"))
 
 
+def workflow_names() -> list[str]:
+    return sorted(p.stem for p in workspace.resource("workflows").glob("*.md"))
+
+
+def cmd_workflow(a):
+    names = workflow_names()
+    if not a.name:
+        print("Workflows (print one with: python -m gighunter workflow NAME):")
+        for n in names:
+            print("  " + n)
+        return
+    if a.name not in names:
+        sys.exit(f"Unknown workflow {a.name!r}. Available: {', '.join(names)}")
+    print(workspace.resource("workflows", f"{a.name}.md").read_text(encoding="utf-8"))
+
+
 def cmd_config(a):
     from .schedule import load_schedule
     settings, aliases, profile = _ctx()
@@ -238,6 +255,7 @@ def main(argv=None):
     c = sub.add_parser("extract"); c.add_argument("file"); c.set_defaults(fn=cmd_extract)
     sub.add_parser("guidelines").set_defaults(fn=cmd_guidelines)
     sub.add_parser("config").set_defaults(fn=cmd_config)
+    c = sub.add_parser("workflow"); c.add_argument("name", nargs="?"); c.set_defaults(fn=cmd_workflow)
     c = sub.add_parser("label"); c.add_argument("job_id"); c.add_argument("rating", choices=["strong", "maybe", "no"])
     c.add_argument("--note"); c.set_defaults(fn=cmd_label)
     c = sub.add_parser("tune"); c.add_argument("--apply", action="store_true")

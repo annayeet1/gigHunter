@@ -39,9 +39,12 @@ annayeet1/gigHunter (public)        you/gigHunter-me (private)
 | `/gighunter:tailor <url or text>` | Fit report (score, requirements vs. evidence), questions, drafts, review rounds, then the resume + cover letter in `resume/<date-company-role>/` |
 | `/gighunter:tune-score` | You rate real listings strong/maybe/no; it fits the score weights and suggests a threshold and alias fixes |
 
+**No plugin? Same workflows:** where third-party plugins aren't allowed, ask Claude to follow
+`python -m gighunter workflow build-resume` (or `tailor`, `tune-score`). The plugin skills load the same text.
+
 ## CLI
 `python -m gighunter --help`: `init`, `scan`, `digest`, `score`, `fetch-jd`, `render`, `extract`,
-`guidelines`, `config`, `label`, `tune`. `python -m gighunter.schedule` shows whether a digest is due.
+`guidelines`, `workflow`, `config`, `label`, `tune`. `python -m gighunter.schedule` shows whether a digest is due.
 
 ## How the match score works
 `score = 100 × sum(weight × component)`, with components skills (40%), title (20%), text similarity (15%),

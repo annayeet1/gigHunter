@@ -9,7 +9,9 @@ workspaces created by `gighunter init` (the maintainer's is annayeet1/gigHunter-
 - `gighunter/resources/defaults/`: default settings.yaml + skill_aliases.yaml (workspace files overlay these).
 - `gighunter/resources/instance/`: templates copied by `init`; the `dot-` prefix becomes `.`.
 - `gighunter/resources/resume_guidelines.md`: sourced rules, printed by `gighunter guidelines`.
-- `plugin/`: Claude Code plugin (skills build-resume, tailor, tune-score); `.claude-plugin/marketplace.json` lists it.
+- `gighunter/resources/workflows/*.md`: the full workflow instructions (single source of truth), printed by
+  `gighunter workflow NAME`.
+- `plugin/`: Claude Code plugin; each skill is a thin pointer to its packaged workflow. Edit the workflow, not SKILL.md.
 - `.claude/notes/`: gotchas, one topic per file.
 
 ## Rules
