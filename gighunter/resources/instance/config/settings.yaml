@@ -2,7 +2,8 @@
 # the defaults shipped with gighunter (run `python -m gighunter config` to see the merged result).
 #
 # email:
-#   to: someone@example.com          # default: send to yourself (SMTP_USER)
+#   to: you@example.com              # REQUIRED with Resend: your Resend account email
+#   provider: auto                   # auto | resend | smtp
 #   smtp_host: smtp.fastmail.com     # default smtp.gmail.com
 #   smtp_port: 465
 #

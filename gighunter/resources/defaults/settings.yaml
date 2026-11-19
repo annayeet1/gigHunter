@@ -3,12 +3,17 @@
 max_listing_age_days: 14      # ignore postings older than this (when the source gives a date)
 
 email:
-  to: ""                      # blank = secret SMTP_TO, else send to yourself (SMTP_USER)
+  # provider: auto = Resend when the RESEND_API_KEY secret exists, else SMTP.
+  #   resend (recommended): a "Sending access" API key can only send mail, never read a mailbox.
+  #   smtp: SMTP_USER / SMTP_PASSWORD secrets (legacy GMAIL_* names also work). Note a Gmail
+  #         app password grants full mailbox access; prefer Resend or a dedicated sending account.
+  provider: auto
+  to: ""                      # recipient. Blank = secret EMAIL_TO / SMTP_TO, else (SMTP only) yourself.
+                              # With Resend's test sender this must be your Resend account email.
   from_name: gigHunter
+  resend_from: ""             # blank = onboarding@resend.dev (no domain needed); set once you verify a domain
   smtp_host: smtp.gmail.com
   smtp_port: 465
-  # Login comes from secrets SMTP_USER / SMTP_PASSWORD (legacy GMAIL_USER / GMAIL_APP_PASSWORD also work).
-  # Not using Gmail? Override smtp_host / smtp_port (implicit TLS, usually 465) in config/settings.yaml.
 
 # Fit tiers: "out" listings are left out of the digest, "reach" ones are labelled.
 fit:

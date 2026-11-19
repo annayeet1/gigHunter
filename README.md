@@ -27,10 +27,12 @@ annayeet1/gigHunter (public)        you/gigHunter-me (private)
    reads any resumes you put in `source_resumes/`, and fills in `aboutme.md`.
 5. Edit `JobParams.md` (titles, level, locations, salary, dealbreakers), `config/sites.yaml` (sources)
    and `config/schedule.toml` (send time + minimum match %).
-6. **Daily email:** push the workspace to a **private** GitHub repo, then under Settings → Secrets → Actions add
-   `SMTP_USER` (your email address) and `SMTP_PASSWORD` (for Gmail, an [app password](https://myaccount.google.com/apppasswords);
-   needs 2-Step Verification), and optionally `SMTP_TO`. Other providers: set `smtp_host`/`smtp_port` in
-   `config/settings.yaml`. (Workspaces from v0.2.0 using `GMAIL_*` secret names keep working.) Test with Actions → daily-digest → Run workflow → *force*.
+6. **Daily email:** push the workspace to a **private** GitHub repo, then pick one:
+   - **Resend (recommended, most secure):** sign up at [resend.com](https://resend.com), create an API key with
+     **Sending access** only (it can send mail and nothing else), add it as the secret `RESEND_API_KEY`, and set
+     `email.to` in `config/settings.yaml` to the address you signed up with. No domain needed.
+   - **SMTP:** secrets `SMTP_USER` and `SMTP_PASSWORD`. A Gmail app password grants *full mailbox access*, so
+     use a dedicated sending account if you go this way. Other providers: set `smtp_host`/`smtp_port`. Test with Actions → daily-digest → Run workflow → *force*.
 
 ## Claude Code skills
 | Skill | What it does |

@@ -2,13 +2,14 @@
 #
 #   jobs:
 #     digest:
-#       uses: annayeet1/gigHunter/.github/workflows/digest.yml@v0.4.0
+#       uses: annayeet1/gigHunter/.github/workflows/digest.yml@v0.5.0
 #       permissions: { contents: write }
 #       with: { force: false }
 #       secrets:
-#         SMTP_USER: ${{ secrets.SMTP_USER }}
+#         RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}   # recommended (send-only key)
+#         EMAIL_TO: ${{ secrets.EMAIL_TO }}
+#         SMTP_USER: ${{ secrets.SMTP_USER }}             # or SMTP instead
 #         SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
-#         SMTP_TO: ${{ secrets.SMTP_TO }}
 #
 # ENGINE_REF below MUST equal the release tag this file ships in (CI enforces it on tags),
 # so a workspace pinned to @vX.Y.Z also installs engine vX.Y.Z.
@@ -22,6 +23,10 @@ on:
         type: boolean
         default: false
     secrets:
+      RESEND_API_KEY:
+        required: false
+      EMAIL_TO:
+        required: false
       SMTP_USER:
         required: false
       SMTP_PASSWORD:
@@ -37,7 +42,7 @@ on:
         required: false
 
 env:
-  ENGINE_REF: v0.4.0
+  ENGINE_REF: v0.5.0
   ENGINE_REPO: https://github.com/annayeet1/gigHunter
 
 jobs:
@@ -65,6 +70,8 @@ jobs:
       - name: Run digest
         if: steps.gate.outputs.send == 'true' || inputs.force
         env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           SMTP_TO: ${{ secrets.SMTP_TO }}

@@ -72,12 +72,62 @@ def credentials() -> tuple[str, str]:
     return user, pw
 
 
+RESEND_URL = "https://api.resend.com/emails"
+RESEND_TEST_SENDER = "onboarding@resend.dev"   # works without a domain; delivers only to your Resend account email
+
+
+def provider(email_cfg: dict) -> str:
+    """'resend' or 'smtp'. 'auto' (default) picks Resend when RESEND_API_KEY is set."""
+    p = (email_cfg.get("provider") or "auto").lower()
+    if p == "auto":
+        return "resend" if os.environ.get("RESEND_API_KEY") else "smtp"
+    if p not in ("resend", "smtp"):
+        raise SystemExit(f"email.provider must be auto, resend or smtp (got {p!r})")
+    return p
+
+
+def recipient(email_cfg: dict, fallback: str | None = None) -> str | None:
+    return email_cfg.get("to") or os.environ.get("EMAIL_TO") or smtp_env("to") or fallback
+
+
 def send(subject: str, html_body: str, text_body: str, email_cfg: dict) -> None:
+    if provider(email_cfg) == "resend":
+        send_resend(subject, html_body, text_body, email_cfg)
+    else:
+        send_smtp(subject, html_body, text_body, email_cfg)
+
+
+def send_resend(subject: str, html_body: str, text_body: str, email_cfg: dict) -> None:
+    """Send through Resend's HTTP API. Use a 'Sending access' key: it can send mail and nothing else."""
+    import requests
+    key = os.environ.get("RESEND_API_KEY")
+    if not key:
+        raise SystemExit("RESEND_API_KEY is not set (create a 'Sending access' key at resend.com).")
+    to = recipient(email_cfg)
+    if not to:
+        raise SystemExit("No recipient: set email.to in config/settings.yaml (or the EMAIL_TO secret) to the "
+                         "address you signed up to Resend with.")
+    sender = email_cfg.get("resend_from") or RESEND_TEST_SENDER
+    r = requests.post(RESEND_URL, timeout=30,
+                      headers={"Authorization": f"Bearer {key}", "User-Agent": "gigHunter"},
+                      json={"from": f"{email_cfg.get('from_name', 'gigHunter')} <{sender}>", "to": [to],
+                            "subject": subject, "html": html_body, "text": text_body})
+    if r.status_code >= 300:
+        try:
+            detail = r.json().get("message", r.text)
+        except ValueError:
+            detail = r.text
+        hint = (" With the onboarding@resend.dev sender, email.to must be your Resend account email."
+                if r.status_code == 403 else "")
+        raise SystemExit(f"Resend rejected the email ({r.status_code}): {detail}.{hint}")
+
+
+def send_smtp(subject: str, html_body: str, text_body: str, email_cfg: dict) -> None:
     user, pw = credentials()
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
     msg["From"] = f"{email_cfg.get('from_name', 'gigHunter')} <{user}>"
-    to = email_cfg.get("to") or smtp_env("to") or user
+    to = recipient(email_cfg, fallback=user)
     msg["To"] = to
     msg.attach(MIMEText(text_body, "plain", "utf-8"))
     msg.attach(MIMEText(html_body, "html", "utf-8"))

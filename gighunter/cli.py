@@ -81,7 +81,7 @@ def cmd_init(a):
 Next:
   1. Fill in aboutme.md (facts) and JobParams.md (what you want); put old resumes in source_resumes/.
   2. Add job sources to config/sites.yaml; set time + threshold in config/schedule.toml.
-  3. git init, commit, push to a PRIVATE GitHub repo; add secrets SMTP_USER and SMTP_PASSWORD.
+  3. git init, commit, push to a PRIVATE GitHub repo; add secret RESEND_API_KEY (send-only key) and set email.to.
   4. In Claude Code: /gighunter:build-resume, /gighunter:tailor, /gighunter:tune-score (plugin), or without
      the plugin ask Claude to follow `python -m gighunter workflow build-resume` (or tailor, tune-score).""")
 
