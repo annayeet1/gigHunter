@@ -10,37 +10,154 @@ from email.mime.text import MIMEText
 from .models import MatchResult
 
 
-def _color(score: float) -> str:
-    return "#1a7f37" if score >= 80 else "#9a6700" if score >= 65 else "#57606a"
+# ---- Email design tokens (dataviz reference palette; light values inline, dark via <style>) ----
+# Email clients strip JS and SVG and many ignore <style>, so everything is inline-styled tables.
+INK, INK_2, MUTED = "#0b0b0b", "#52514e", "#898781"        # primary / secondary / muted text
+PAGE, SURFACE, HAIRLINE = "#f9f9f7", "#fcfcfb", "#e1e0d9"  # page plane / card surface / hairline
+ACCENT, TRACK = "#2a78d6", "#cde2fb"                       # meter fill (blue 450) / track (blue 100, same ramp)
+LINK = "#1c5cab"                                           # blue 550: link text, >= 4.5:1 on the surface
+GOOD, WARNING = "#0ca30c", "#fab219"                       # reserved status colors; always icon + label
+FONT = "'Segoe UI',Roboto,Helvetica,Arial,sans-serif"
+
+_DARK_CSS = f"""
+<style>
+  :root {{ color-scheme: light dark; supported-color-schemes: light dark; }}
+  @media (prefers-color-scheme: dark) {{
+    .gh-page {{ background:#0d0d0d !important; }}
+    .gh-card {{ background:#1a1a19 !important; border-color:#2c2c2a !important; }}
+    .gh-ink {{ color:#f0efec !important; }}
+    .gh-ink2 {{ color:#c3c2b7 !important; }}
+    .gh-link {{ color:#86b6ef !important; }}
+    .gh-track {{ background:#184f95 !important; }}
+    .gh-fill {{ background:#3987e5 !important; }}
+  }}
+</style>"""
 
 
-def render_html(results: list[MatchResult], day: str, threshold: float = 0) -> str:
-    rows = []
-    for r in results:
-        j, b = r.job, r.breakdown
-        why = ", ".join(r.matched_skills[:8]) or "-"
-        gaps = ", ".join(r.missing_skills[:6]) or "-"
-        parts = " · ".join(f"{k.replace('_', ' ')} {v:.0%}" for k, v in b.items())
-        badge = ("" if r.tier != "reach" else
-                 f'<span style="background:#fff8c5;border:1px solid #d4a72c;border-radius:4px;padding:0 4px;'
-                 f'font-size:11px">REACH: {html.escape("; ".join(r.tier_reasons))}</span><br>')
-        rows.append(f"""
-<tr><td style="padding:10px;border-bottom:1px solid #eee;vertical-align:top">
-  <div style="font-size:22px;font-weight:bold;color:{_color(r.score)}">{r.score:.0f}%</div></td>
-<td style="padding:10px;border-bottom:1px solid #eee">
-  <a href="{html.escape(j.url)}" style="font-size:16px;font-weight:bold">{html.escape(j.title)}</a><br>
-  {badge}{html.escape(j.company)} · {html.escape(j.location or 'n/a')} · <span style="color:#888">{html.escape(j.source)}</span><br>
-  <span style="font-size:12px">✅ {html.escape(why)}<br>⚠️ gaps: {html.escape(gaps)}</span><br>
-  <span style="font-size:11px;color:#888">{parts}</span>
-</td></tr>""")
-    body = "".join(rows) or "<tr><td>No new listings above your threshold today.</td></tr>"
-    return f"""<html><body style="font-family:Segoe UI,Arial,sans-serif;max-width:760px">
-<h2>gigHunter: {len(results)} new match{'es' if len(results) != 1 else ''} for {day}</h2>
-<p style="color:#57606a;font-size:12px">Showing new listings scoring at least {threshold:g}% (set in config/schedule.toml).</p>
-<table style="border-collapse:collapse;width:100%">{body}</table>
-<p style="font-size:11px;color:#888">To tailor a resume: open the repo in Claude Code and run
-<code>python -m gighunter workflow tailor</code> (or /gighunter:tailor) with the job link.
-Listings marked REACH are one step beyond your profile; out-of-scope listings are left out.</p></body></html>"""
+def _e(s) -> str:
+    return html.escape(str(s or ""))
+
+
+def _tier_chip(tier: str) -> str:
+    """Status chip: color + icon + word, never color alone. Text inside warning is near-black."""
+    if tier == "reach":
+        bg, fg, label = WARNING, INK, "&#9650; Reach"      # ▲
+    else:
+        bg, fg, label = GOOD, "#ffffff", "&#10003; Fit"    # ✓
+    return (f'<span style="display:inline-block;background:{bg};color:{fg};border-radius:999px;'
+            f'padding:2px 9px;font:600 11px {FONT};letter-spacing:.2px">{label}</span>')
+
+
+def _meter(score: float) -> str:
+    """Thin meter: blue fill on a lighter step of the same ramp, rounded ends, no text inside."""
+    pct = max(2, min(100, round(score)))
+    rest = 100 - pct
+    filled = (f'<td class="gh-fill" width="{pct}%" style="background:{ACCENT};height:6px;font-size:0;line-height:0;'
+              f'border-radius:{"999px" if rest == 0 else "999px 0 0 999px"}">&nbsp;</td>')
+    empty = (f'<td width="{rest}%" style="height:6px;font-size:0;line-height:0">&nbsp;</td>' if rest else "")
+    return (f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="gh-track" '
+            f'style="background:{TRACK};border-radius:999px;border-collapse:separate"><tr>{filled}{empty}</tr></table>')
+
+
+def _stat(label: str, value) -> str:
+    """Stat tile: sentence-case label, semibold value, both in text ink (never series color)."""
+    return (f'<td class="gh-card" style="background:{SURFACE};border:1px solid {HAIRLINE};border-radius:10px;'
+            f'padding:12px 14px;width:25%">'
+            f'<div class="gh-ink2" style="font:400 12px {FONT};color:{INK_2}">{_e(label)}</div>'
+            f'<div class="gh-ink" style="font:600 24px {FONT};color:{INK};margin-top:2px">{_e(value)}</div></td>')
+
+
+def _card(r: MatchResult) -> str:
+    j = r.job
+    meta = " &middot; ".join(_e(x) for x in [j.company, j.location or "Location n/a", j.source] if x)
+    matched = ", ".join(r.matched_skills[:8])
+    gaps = ", ".join(r.missing_skills[:6])
+    why = ""
+    if r.tier == "reach" and r.tier_reasons:
+        why = (f'<div class="gh-ink2" style="font:400 12px {FONT};color:{INK_2};margin-top:6px">'
+               f'Why it&rsquo;s a reach: {_e("; ".join(r.tier_reasons))}</div>')
+    skills = ""
+    if matched:
+        skills += (f'<div class="gh-ink2" style="font:400 12px {FONT};color:{INK_2};margin-top:8px">'
+                   f'<b class="gh-ink" style="color:{INK};font-weight:600">You have:</b> {_e(matched)}</div>')
+    if gaps:
+        skills += (f'<div class="gh-ink2" style="font:400 12px {FONT};color:{INK_2};margin-top:2px">'
+                   f'<b class="gh-ink" style="color:{INK};font-weight:600">Gaps:</b> {_e(gaps)}</div>')
+    parts = " &middot; ".join(f"{k.replace('_', ' ')} {v:.0%}" for k, v in r.breakdown.items() if k != "bonus" or v)
+    return f"""
+<tr><td style="padding:0 0 12px 0">
+ <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="gh-card"
+        style="background:{SURFACE};border:1px solid {HAIRLINE};border-radius:12px;border-collapse:separate">
+  <tr><td style="padding:16px 18px">
+   <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+    <td style="vertical-align:top">
+     <a class="gh-link" href="{_e(j.url)}" style="font:600 16px {FONT};color:{LINK};text-decoration:none">{_e(j.title)}</a>
+     <div class="gh-ink2" style="font:400 13px {FONT};color:{INK_2};margin-top:3px">{meta}</div>
+    </td>
+    <td style="vertical-align:top;text-align:right;white-space:nowrap;padding-left:12px">{_tier_chip(r.tier)}</td>
+   </tr></table>
+   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:12px"><tr>
+    <td style="vertical-align:middle">{_meter(r.score)}</td>
+    <td class="gh-ink" style="vertical-align:middle;width:52px;text-align:right;font:600 15px {FONT};color:{INK}">{r.score:.0f}%</td>
+   </tr></table>
+   {why}{skills}
+   <div style="font:400 11px {FONT};color:{MUTED};margin-top:8px">{parts}</div>
+  </td></tr>
+ </table>
+</td></tr>"""
+
+
+def _section(title: str, results: list[MatchResult]) -> str:
+    if not results:
+        return ""
+    head = (f'<tr><td class="gh-ink" style="padding:18px 0 8px 0;font:600 14px {FONT};color:{INK}">'
+            f'{_e(title)} <span class="gh-ink2" style="color:{INK_2};font-weight:400">({len(results)})</span></td></tr>')
+    return head + "".join(_card(r) for r in results)
+
+
+def render_html(results: list[MatchResult], day: str, threshold: float = 0, scanned: int | None = None) -> str:
+    fits = [r for r in results if r.tier != "reach"]
+    reaches = [r for r in results if r.tier == "reach"]
+    n = len(results)
+    preheader = (f"{len(fits)} fit, {len(reaches)} reach" if n else "No new matches today")
+    tiles = "".join([
+        _stat("New matches", n), '<td style="width:8px"></td>',
+        _stat("Fit", len(fits)), '<td style="width:8px"></td>',
+        _stat("Reach", len(reaches)), '<td style="width:8px"></td>',
+        _stat("Listings scanned", f"{scanned:,}" if scanned is not None else "n/a"),
+    ])
+    if n:
+        body = _section("Strong fits", fits) + _section("Reaches: one step beyond your profile", reaches)
+    else:
+        body = (f'<tr><td class="gh-card gh-ink2" style="background:{SURFACE};border:1px solid {HAIRLINE};'
+                f'border-radius:12px;padding:24px;text-align:center;font:400 14px {FONT};color:{INK_2}">'
+                f'No new listings at or above {threshold:g}% today. Tomorrow&rsquo;s scan runs automatically.</td></tr>')
+    return f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark">
+<title>gigHunter digest</title>{_DARK_CSS}</head>
+<body class="gh-page" style="margin:0;padding:0;background:{PAGE}">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0">{_e(preheader)}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="gh-page" style="background:{PAGE}">
+ <tr><td align="center" style="padding:24px 12px">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:640px">
+   <tr><td style="padding:0 0 4px 0">
+    <div class="gh-ink" style="font:700 22px {FONT};color:{INK}">gigHunter</div>
+    <div class="gh-ink2" style="font:400 13px {FONT};color:{INK_2};margin-top:2px">Your job matches for {_e(day)}</div>
+   </td></tr>
+   <tr><td style="padding:14px 0 4px 0">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate"><tr>{tiles}</tr></table>
+   </td></tr>
+   {body}
+   <tr><td style="padding:16px 2px 0 2px;font:400 11px {FONT};color:{MUTED};line-height:1.5">
+    Showing new listings scoring at least {threshold:g}% (config/schedule.toml). &#10003; Fit = matches your
+    profile; &#9650; Reach = one step beyond it (reason shown). Out-of-scope listings are left out.<br>
+    To tailor a resume and cover letter, ask Claude to follow <code>python -m gighunter workflow tailor</code>
+    (or /gighunter:tailor) with the job link.
+   </td></tr>
+  </table>
+ </td></tr>
+</table></body></html>"""
 
 
 def render_text(results: list[MatchResult]) -> str:

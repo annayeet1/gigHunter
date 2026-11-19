@@ -2,7 +2,7 @@
 #
 #   jobs:
 #     digest:
-#       uses: annayeet1/gigHunter/.github/workflows/digest.yml@v0.5.0
+#       uses: annayeet1/gigHunter/.github/workflows/digest.yml@v0.5.1
 #       permissions: { contents: write }
 #       with: { force: false }
 #       secrets:
@@ -42,7 +42,7 @@ on:
         required: false
 
 env:
-  ENGINE_REF: v0.5.0
+  ENGINE_REF: v0.5.1
   ENGINE_REPO: https://github.com/annayeet1/gigHunter
 
 jobs:

@@ -119,10 +119,12 @@ def cmd_digest(a):
         if not due:
             return
     seen = store.seen_ids()
-    fresh = [r for r in _ranked(settings, aliases, profile)
-             if r.job.id not in seen and r.score >= sched.min_match_score][: sched.max_listings]
+    everything = _ranked(settings, aliases, profile, include_out=True)
+    fresh = [r for r in everything if not r.excluded_reason
+             and r.job.id not in seen and r.score >= sched.min_match_score]
+    fresh = sorted(fresh, key=lambda r: -r.score)[: sched.max_listings]
     day = now.strftime("%a %b %d")
-    html_body = digest.render_html(fresh, day, sched.min_match_score)
+    html_body = digest.render_html(fresh, day, sched.min_match_score, scanned=len(everything))
     if a.dry_run:
         out = workspace.path("digest_preview.html")
         out.write_text(html_body, encoding="utf-8")
