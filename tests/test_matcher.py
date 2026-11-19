@@ -59,3 +59,22 @@ def test_seniority_range():
 def test_single_level_string_still_works():
     r = score_job(prof(seniority="senior"), job(title="Senior Data Engineer"), W, ALIASES)
     assert r.breakdown["seniority"] == 1.0
+
+
+def test_location_city_state_is_not_whole_state():
+    from gighunter.matcher import location_matches as m
+    assert m("Madison, WI", "Madison, WI")
+    assert m("Madison, WI", "Madison, Wisconsin, United States")
+    assert m("Madison, WI", "Madison")                  # listing names no state: city is enough
+    assert not m("Madison, WI", "Milwaukee, WI")        # used to match (any part matched)
+    assert not m("Madison, WI", "Madison, AL")
+    assert not m("Madison, WI", "Madison, Alabama")
+
+
+def test_location_state_only_and_plain_city():
+    from gighunter.matcher import location_matches as m
+    assert m("WI", "Milwaukee, WI") and m("Wisconsin", "Green Bay, WI")
+    assert not m("WI", "Chicago, IL")
+    assert m("Boston", "Boston, MA")
+    assert not m("IN", "Remote in any state")          # lowercase words aren't state codes
+    assert m("Toronto, Canada", "Toronto, Ontario, Canada") and not m("Toronto, Canada", "Toronto, OH")

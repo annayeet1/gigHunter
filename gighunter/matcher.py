@@ -99,8 +99,65 @@ def score_seniority(profile: Profile, job: Job) -> float:
     return s
 
 
+US_STATES = {
+    "AL": "alabama", "AK": "alaska", "AZ": "arizona", "AR": "arkansas", "CA": "california",
+    "CO": "colorado", "CT": "connecticut", "DE": "delaware", "DC": "district of columbia",
+    "FL": "florida", "GA": "georgia", "HI": "hawaii", "ID": "idaho", "IL": "illinois",
+    "IN": "indiana", "IA": "iowa", "KS": "kansas", "KY": "kentucky", "LA": "louisiana",
+    "ME": "maine", "MD": "maryland", "MA": "massachusetts", "MI": "michigan", "MN": "minnesota",
+    "MS": "mississippi", "MO": "missouri", "MT": "montana", "NE": "nebraska", "NV": "nevada",
+    "NH": "new hampshire", "NJ": "new jersey", "NM": "new mexico", "NY": "new york",
+    "NC": "north carolina", "ND": "north dakota", "OH": "ohio", "OK": "oklahoma", "OR": "oregon",
+    "PA": "pennsylvania", "RI": "rhode island", "SC": "south carolina", "SD": "south dakota",
+    "TN": "tennessee", "TX": "texas", "UT": "utah", "VT": "vermont", "VA": "virginia",
+    "WA": "washington", "WV": "west virginia", "WI": "wisconsin", "WY": "wyoming",
+}
+_NAME_TO_ABBR = {v: k for k, v in US_STATES.items()}
+_ABBR_WORD = re.compile(r"\b([A-Z]{2})\b")
+
+
+def _states_in(location: str) -> set[str]:
+    """US states named in a listing location, as abbreviations. Abbreviations must be
+    uppercase ('IN', 'OR'), so ordinary words like 'in' or 'or' don't count."""
+    found = {a for a in _ABBR_WORD.findall(location) if a in US_STATES}
+    low = location.lower()
+    found |= {abbr for name, abbr in _NAME_TO_ABBR.items() if phrase_in(name, low)}
+    return found
+
+
+def _state_abbr(text: str) -> str | None:
+    t = text.strip()
+    return t.upper() if t.upper() in US_STATES else _NAME_TO_ABBR.get(t.lower())
+
+
+def location_matches(want: str, location: str) -> bool:
+    """'Verona, WI' = that city in that state (state checked whenever the listing names one).
+    'WI' or 'Wisconsin' = anywhere in the state. 'Boston' = any place called Boston.
+    Anything after the first comma that isn't a US state (e.g. 'Toronto, Canada') must also appear."""
+    parts = [p.strip() for p in want.split(",") if p.strip()]
+    if not parts:
+        return False
+    low = location.lower()
+    listed = _states_in(location)
+    if len(parts) == 1:
+        st = _state_abbr(parts[0])
+        return st in listed if st else phrase_in(parts[0].lower(), low)
+    city, rest = parts[0], parts[1:]
+    if not phrase_in(city.lower(), low):
+        return False
+    for r in rest:
+        st = _state_abbr(r)
+        if st:
+            if listed and st not in listed:
+                return False
+        elif not phrase_in(r.lower(), low):
+            return False
+    return True
+
+
 def score_location(profile: Profile, job: Job) -> float:
-    loc = (job.location or "").lower()
+    raw = job.location or ""
+    loc = raw.lower()
     remote = job.remote if job.remote is not None else ("remote" in loc or "anywhere" in loc)
     if remote and "remote" in profile.work_modes:
         return 1.0
@@ -108,8 +165,7 @@ def score_location(profile: Profile, job: Job) -> float:
         return 0.5
     if {"hybrid", "onsite"} & set(profile.work_modes):
         for want in profile.locations:
-            parts = [p.strip().lower() for p in want.split(",") if p.strip()]
-            if any(phrase_in(p, loc) for p in parts):
+            if location_matches(want, raw):
                 return 1.0
     return 0.0
 

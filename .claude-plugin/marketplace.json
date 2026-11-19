@@ -7,7 +7,7 @@
       "name": "gighunter",
       "source": "./plugin",
       "description": "Interactive skills: build-resume, tailor (resume + cover letter per listing), tune-score.",
-      "version": "0.3.3"
+      "version": "0.3.4"
     }
   ]
 }

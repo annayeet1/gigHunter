@@ -17,7 +17,7 @@ target_seniority: [mid]
 
 # Where you're willing to work
 work_modes: [remote, hybrid]   # any of: remote, hybrid, onsite
-locations:                     # acceptable metros / states / countries for hybrid or onsite
+locations:                     # for hybrid/onsite. "City, ST" = that city only; "WI" = whole state; "Boston" = any Boston
   - "TODO: e.g. Madison, WI"
 
 min_salary_usd: 0              # 0 = don't filter on salary
