@@ -35,6 +35,7 @@ class Profile:
     body: str                    # aboutme.md free-form markdown (facts)
     ideal_job: str = ""          # JobParams.md free-form markdown (preferences)
     raw: dict = field(default_factory=dict)
+    skill_context: dict[str, list[str]] = field(default_factory=dict)   # skill -> words, one of which must also appear
 
 
 @dataclass
@@ -45,3 +46,6 @@ class MatchResult:
     matched_skills: list[str]
     missing_skills: list[str]
     excluded_reason: str | None = None
+    tier: str = "fit"                      # fit | reach | out
+    tier_reasons: list[str] = field(default_factory=list)
+    raw_score: float = 0.0                 # score before exclusion (for explaining 'out' listings)

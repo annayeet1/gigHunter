@@ -21,12 +21,15 @@ def render_html(results: list[MatchResult], day: str, threshold: float = 0) -> s
         why = ", ".join(r.matched_skills[:8]) or "-"
         gaps = ", ".join(r.missing_skills[:6]) or "-"
         parts = " · ".join(f"{k.replace('_', ' ')} {v:.0%}" for k, v in b.items())
+        badge = ("" if r.tier != "reach" else
+                 f'<span style="background:#fff8c5;border:1px solid #d4a72c;border-radius:4px;padding:0 4px;'
+                 f'font-size:11px">REACH: {html.escape("; ".join(r.tier_reasons))}</span><br>')
         rows.append(f"""
 <tr><td style="padding:10px;border-bottom:1px solid #eee;vertical-align:top">
   <div style="font-size:22px;font-weight:bold;color:{_color(r.score)}">{r.score:.0f}%</div></td>
 <td style="padding:10px;border-bottom:1px solid #eee">
   <a href="{html.escape(j.url)}" style="font-size:16px;font-weight:bold">{html.escape(j.title)}</a><br>
-  {html.escape(j.company)} · {html.escape(j.location or 'n/a')} · <span style="color:#888">{html.escape(j.source)}</span><br>
+  {badge}{html.escape(j.company)} · {html.escape(j.location or 'n/a')} · <span style="color:#888">{html.escape(j.source)}</span><br>
   <span style="font-size:12px">✅ {html.escape(why)}<br>⚠️ gaps: {html.escape(gaps)}</span><br>
   <span style="font-size:11px;color:#888">{parts}</span>
 </td></tr>""")
@@ -36,11 +39,13 @@ def render_html(results: list[MatchResult], day: str, threshold: float = 0) -> s
 <p style="color:#57606a;font-size:12px">Showing new listings scoring at least {threshold:g}% (set in config/schedule.toml).</p>
 <table style="border-collapse:collapse;width:100%">{body}</table>
 <p style="font-size:11px;color:#888">To tailor a resume: open the repo in Claude Code and run
-<code>/tailor-resume &lt;job url&gt;</code>.</p></body></html>"""
+<code>python -m gighunter workflow tailor</code> (or /gighunter:tailor) with the job link.
+Listings marked REACH are one step beyond your profile; out-of-scope listings are left out.</p></body></html>"""
 
 
 def render_text(results: list[MatchResult]) -> str:
-    return "\n\n".join(f"{r.score:.0f}%  {r.job.title} @ {r.job.company}\n{r.job.url}" for r in results) \
+    return "\n\n".join(f"{r.score:.0f}%  {'[REACH] ' if r.tier == 'reach' else ''}{r.job.title} @ {r.job.company}\n{r.job.url}"
+                       for r in results) \
         or "No new listings above your threshold today."
 
 

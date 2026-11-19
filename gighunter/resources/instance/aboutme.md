@@ -21,6 +21,8 @@ current_seniority: mid       # junior | mid | senior | staff | principal (where 
 
 # Skills, weighted by how strongly you want them to count (1-3).
 # 3 = core strength, 2 = solid, 1 = familiar.
+# A skill that is also an ordinary word can require context:
+#   clarity: {weight: 3, requires_any: [epic, caboodle]}
 skills:
   TODO-skill-a: 3
   TODO-skill-b: 2

@@ -81,13 +81,17 @@ def _evaluate(weights, items):
 
 
 def fit(profile, settings, aliases) -> dict:
+    if "_vocab" not in settings:
+        from .profile import load_vocab
+        settings = {**settings, "_vocab": load_vocab()}
     rows = [json.loads(l) for l in labels_path().read_text(encoding="utf-8").splitlines() if l.strip()] \
         if labels_path().exists() else []
     if len({r["rating"] for r in rows}) < 2:
         raise ValueError("Need listings rated with at least two different ratings to tune.")
     items, scored = [], []
     for r in rows:
-        res = score_job(profile, _job(r["job"]), settings["weights"], aliases)
+        res = score_job(profile, _job(r["job"]), settings["weights"], aliases,
+                        vocab=settings.get("_vocab"), fit=settings.get("fit"))
         items.append((RATING[r["rating"]], res.breakdown))
         scored.append((r["rating"], res))
 

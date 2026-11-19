@@ -1,0 +1,91 @@
+# Common tech skills, used ONLY to detect gaps: skills a listing asks for that aren't in your
+# aboutme.md. They never add to your score. Keep entries unambiguous: no words that are also
+# ordinary English ("react", "swift", "spring", "excel", "go"), or they create false gaps.
+# Add your own in <workspace>/config/tech_skills.yaml (same format).
+skills:
+  # languages
+  - c++
+  - golang
+  - rust
+  - scala
+  - kotlin
+  - php
+  - perl
+  - ruby on rails
+  - matlab
+  - sas
+  - stata
+  - spss
+  - bash
+  - html
+  - css
+  - reactjs
+  - react.js
+  - react native
+  - node.js
+  - nodejs
+  - angular
+  - vue.js
+  - django
+  - flask
+  - spring boot
+  - .net core
+  - graphql
+  # data engineering & BI
+  - apache spark
+  - pyspark
+  - spark sql
+  - hadoop
+  - kafka
+  - airflow
+  - dbt
+  - snowflake
+  - databricks
+  - redshift
+  - bigquery
+  - synapse
+  - azure data factory
+  - informatica
+  - talend
+  - ssis
+  - ssrs
+  - tableau
+  - power bi
+  - looker
+  - qlik
+  - mongodb
+  - cassandra
+  - redis
+  - elasticsearch
+  - dynamodb
+  - cosmos db
+  - teradata
+  - db2
+  # ML
+  - tensorflow
+  - pytorch
+  - scikit-learn
+  # cloud, infrastructure, devops
+  - docker
+  - terraform
+  - ansible
+  - chef
+  - jenkins
+  - github actions
+  - azure devops
+  - helm
+  - openshift
+  - vmware
+  - hyper-v
+  - linux
+  - unix
+  - windows server
+  - active directory
+  - cisco
+  # business systems
+  - salesforce
+  - sap
+  - servicenow
+  - workday
+  # design
+  - figma

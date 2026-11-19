@@ -10,6 +10,15 @@ email:
   # Login comes from secrets SMTP_USER / SMTP_PASSWORD (legacy GMAIL_USER / GMAIL_APP_PASSWORD also work).
   # Not using Gmail? Override smtp_host / smtp_port (implicit TLS, usually 465) in config/settings.yaml.
 
+# Fit tiers: "out" listings are left out of the digest, "reach" ones are labelled.
+fit:
+  min_title: 0.5              # title must share your target titles' distinctive word(s)
+  min_skill_coverage: 0.35    # below: missing most recognisable required skills -> out
+  reach_skill_coverage: 0.6   # between min and this: reach
+  max_level_gap_up: 1         # 1 = one level above your range (e.g. Senior) is a reach; 0 = out
+  reach_years_over: 1         # required years > yours + 1 -> reach
+  exclude_years_over: 4       # required years > yours + 4 -> out
+
 # Match score weights (must sum to 1.0). Tune these together with the formula.
 weights:
   skills: 0.40

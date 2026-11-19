@@ -52,6 +52,14 @@ def load_aliases() -> dict[str, list[str]]:
     return out
 
 
+def load_vocab() -> list[str]:
+    """Common tech skills used only to detect gaps (skills a listing asks for that you don't list).
+    Engine list plus optional workspace additions in config/tech_skills.yaml."""
+    terms = list(_yaml(workspace.resource("defaults", "tech_skills.yaml")).get("skills", []))
+    terms += list(_yaml(workspace.path("config", "tech_skills.yaml")).get("skills", []))
+    return list(dict.fromkeys(str(t).lower() for t in terms))
+
+
 def load_sites() -> list[dict]:
     return _yaml(workspace.path("config", "sites.yaml")).get("sources", [])
 
@@ -92,7 +100,17 @@ def load_profile(about_path: Path | None = None, params_path: Path | None = None
     prefs = {k: about[k] for k in PREFERENCE_KEYS if k in about}   # legacy fallback
     prefs.update({k: v for k, v in params.items() if k in PREFERENCE_KEYS})
 
-    skills = {str(k).lower(): int(v) for k, v in (about.get("skills") or {}).items() if not _is_todo(k)}
+    skills, context = {}, {}
+    for k, v in (about.get("skills") or {}).items():
+        if _is_todo(k):
+            continue
+        name = str(k).lower()
+        if isinstance(v, dict):            # e.g. clarity: {weight: 3, requires_any: [epic, caboodle]}
+            skills[name] = int(v.get("weight", 1))
+            if v.get("requires_any"):
+                context[name] = [str(c) for c in v["requires_any"]]
+        else:
+            skills[name] = int(v)
     seniority = prefs.get("target_seniority") or about.get("current_seniority") or about.get("seniority") or "mid"
 
     return Profile(
@@ -109,4 +127,5 @@ def load_profile(about_path: Path | None = None, params_path: Path | None = None
         body=_strip_todo_lines(body),
         ideal_job=_strip_todo_lines(ideal),
         raw={"about": about, "params": params},
+        skill_context=context,
     )

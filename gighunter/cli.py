@@ -30,12 +30,19 @@ log = logging.getLogger("gighunter")
 
 # ---------------------------------------------------------------- helpers
 def _ctx():
-    from .profile import load_aliases, load_profile, load_settings
-    return load_settings(), load_aliases(), load_profile()
+    from .profile import load_aliases, load_profile, load_settings, load_vocab
+    settings = load_settings()
+    settings["_vocab"] = load_vocab()      # gap-detection skill list, passed to score_job
+    return settings, load_aliases(), load_profile()
 
 
-def _ranked(settings, aliases, profile):
+def _score(profile, job, settings, aliases):
     from .matcher import score_job
+    return score_job(profile, job, settings["weights"], aliases,
+                     vocab=settings.get("_vocab"), fit=settings.get("fit"))
+
+
+def _ranked(settings, aliases, profile, include_out=False):
     from .profile import load_sites
     from .sources import fetch_all
     jobs = fetch_all(load_sites())
@@ -44,7 +51,9 @@ def _ranked(settings, aliases, profile):
         cutoff = datetime.now(timezone.utc) - timedelta(days=max_age)
         jobs = [j for j in jobs if not j.posted or _aware(j.posted) >= cutoff]
     uniq = {j.id: j for j in jobs}
-    results = [score_job(profile, j, settings["weights"], aliases) for j in uniq.values()]
+    results = [_score(profile, j, settings, aliases) for j in uniq.values()]
+    if include_out:
+        return sorted(results, key=lambda r: -r.raw_score)
     return sorted((r for r in results if not r.excluded_reason), key=lambda r: -r.score)
 
 
@@ -78,7 +87,7 @@ Next:
 
 def cmd_scan(a):
     settings, aliases, profile = _ctx()
-    results = _ranked(settings, aliases, profile)[: a.top]
+    results = _ranked(settings, aliases, profile, include_out=a.show_out)[: a.top]
     if a.save:
         from .tune import save_scan
         save_scan(results)
@@ -86,10 +95,15 @@ def cmd_scan(a):
         print(json.dumps([{"id": r.job.id, "score": r.score, "title": r.job.title, "company": r.job.company,
                            "location": r.job.location, "url": r.job.url,
                            "breakdown": {k: round(v, 2) for k, v in r.breakdown.items()},
-                           "matched": r.matched_skills, "missing": r.missing_skills} for r in results], indent=1))
+                           "matched": r.matched_skills, "missing": r.missing_skills,
+                           "tier": r.tier, "tier_reasons": r.tier_reasons,
+                           "excluded_reason": r.excluded_reason, "raw_score": r.raw_score} for r in results], indent=1))
         return
     for r in results:
-        print(f"{r.score:5.1f}  {r.job.title[:50]:50}  {r.job.company[:22]:22}  {r.job.id:28}  {r.job.url}")
+        tag = {"fit": "FIT  ", "reach": "REACH", "out": "OUT  "}[r.tier] if not r.excluded_reason or r.tier == "out" else "DROP "
+        print(f"{r.raw_score:5.1f} {tag} {r.job.title[:46]:46}  {r.job.company[:20]:20}  {r.job.url}")
+        if a.show_out and r.excluded_reason:
+            print(f"            {r.excluded_reason}")
 
 
 def cmd_digest(a):
@@ -124,7 +138,6 @@ def cmd_digest(a):
 
 
 def cmd_score(a):
-    from .matcher import score_job
     from .models import Job
     from .sources._http import get_text
     from .text import html_to_text
@@ -132,8 +145,10 @@ def cmd_score(a):
     text = html_to_text(get_text(a.url)) if a.url else Path(a.file).read_text(encoding="utf-8")
     job = Job(id="adhoc", title=a.title or text.strip().splitlines()[0][:120], company=a.company or "",
               url=a.url or a.file or "", description=text, location=a.location or "")
-    r = score_job(profile, job, settings["weights"], aliases)
-    print(f"Match score: {r.score:.1f}%" + (f"  (EXCLUDED: {r.excluded_reason})" if r.excluded_reason else ""))
+    r = _score(profile, job, settings, aliases)
+    print(f"Match score: {r.raw_score:.1f}%   tier: {r.tier.upper()}"
+          + (f"  ({'; '.join(r.tier_reasons)})" if r.tier_reasons else "")
+          + (f"\n  EXCLUDED from digest: {r.excluded_reason}" if r.excluded_reason else ""))
     for k, v in r.breakdown.items():
         w = settings["weights"].get(k, 0)
         print(f"  {k:16} {v:5.0%}  x {w:.2f} = {100 * w * v:5.1f}")
@@ -233,6 +248,11 @@ def cmd_tune(a):
 
 # ---------------------------------------------------------------- entry
 def main(argv=None):
+    for stream in (sys.stdout, sys.stderr):        # Windows consoles (cp1252) choke on emoji in titles
+        try:
+            stream.reconfigure(errors="replace")
+        except (AttributeError, ValueError):
+            pass
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     p = argparse.ArgumentParser(prog="gighunter", description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -241,6 +261,7 @@ def main(argv=None):
     c = sub.add_parser("init"); c.add_argument("folder"); c.set_defaults(fn=cmd_init)
     c = sub.add_parser("scan"); c.add_argument("--top", type=int, default=30)
     c.add_argument("--save", action="store_true"); c.add_argument("--json", action="store_true")
+    c.add_argument("--show-out", action="store_true", help="also list out-of-scope/dropped listings with the reason")
     c.set_defaults(fn=cmd_scan)
     c = sub.add_parser("digest"); c.add_argument("--force", action="store_true")
     c.add_argument("--dry-run", action="store_true"); c.set_defaults(fn=cmd_digest)

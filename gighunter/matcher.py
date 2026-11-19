@@ -1,4 +1,4 @@
-"""Match-score formula (v1).
+"""Match-score formula (v2: weighted titles, gap vocabulary, fit tiers).
 
 score = 100 * sum(weight_i * component_i), each component in 0..1.
 Weights live in config/settings.yaml. Hard filters run first and drop the job.
@@ -16,6 +16,8 @@ location         Remote/hybrid/onsite fit with your work_modes and locations.
 bonus            Hits on bonus_keywords (2 hits = full credit).
 
 Hard filters: dealbreaker phrase present; known salary max below min_salary_usd.
+Fit tiers (fit_tier): 'out' listings are excluded like hard filters; 'reach' ones are labelled.
+Skills can require context in aboutme.md: clarity: {weight: 3, requires_any: [epic, caboodle]}.
 """
 from __future__ import annotations
 
@@ -35,6 +37,25 @@ _TITLE_NOISE = set(_LEVEL_WORDS) | {"i", "ii", "iii", "iv", "remote", "hybrid", 
 _YEARS = re.compile(r"(\d{1,2})\s*\+?\s*(?:-\s*\d{1,2}\s*)?(?:years|yrs)", re.I)
 UNKNOWN_SKILL_WEIGHT = 2  # weight given to a recognised skill you don't have
 
+# Role words that appear in almost every tech title. They count, but far less than the
+# distinctive word ("BI", "Data", "Database"), so "UI Developer" barely matches "BI Developer".
+GENERIC_TITLE_WORDS = {
+    "engineer", "engineering", "developer", "development", "administrator", "admin", "analyst",
+    "specialist", "manager", "consultant", "technician", "programmer", "scientist", "officer",
+    "coordinator", "associate", "representative", "expert", "professional",
+}
+GENERIC_WEIGHT = 0.25
+
+# Fit tiers (override any key under `fit:` in config/settings.yaml).
+DEFAULT_FIT = {
+    "min_title": 0.5,              # below: not your role family -> out of scope
+    "min_skill_coverage": 0.35,    # below: missing most recognisable required skills -> out of scope
+    "reach_skill_coverage": 0.6,   # below (but above min): noticeable gaps -> reach
+    "max_level_gap_up": 1,         # levels above your highest accepted level allowed as a reach
+    "reach_years_over": 1,         # required years > yours + this -> reach
+    "exclude_years_over": 4,       # required years > yours + this -> out of scope
+}
+
 
 def _skill_terms(skill: str, aliases: dict[str, list[str]]) -> list[str]:
     terms = [skill]
@@ -46,35 +67,55 @@ def _skill_terms(skill: str, aliases: dict[str, list[str]]) -> list[str]:
     return terms
 
 
-def score_skills(profile: Profile, text_lower: str, aliases: dict) -> tuple[float, list[str], list[str]]:
+def _skill_present(skill: str, text_lower: str, aliases: dict, context: dict) -> bool:
+    if not any(phrase_in(t, text_lower) for t in _skill_terms(skill, aliases)):
+        return False
+    need = context.get(skill)
+    return not need or any(phrase_in(c.lower(), text_lower) for c in need)
+
+
+def score_skills(profile: Profile, text_lower: str, aliases: dict,
+                 vocab: list[str] | None = None) -> tuple[float, list[str], list[str], float | None]:
+    """Returns (score, matched, missing, coverage). coverage is None when the listing names no
+    skill we can recognise. `vocab` = extra skill names used only to detect gaps."""
+    context = getattr(profile, "skill_context", {}) or {}
     matched, matched_w = [], 0
     for skill, w in profile.skills.items():
-        if any(phrase_in(t, text_lower) for t in _skill_terms(skill, aliases)):
+        if _skill_present(skill, text_lower, aliases, context):
             matched.append(skill)
             matched_w += w
     have = {t for s in profile.skills for t in _skill_terms(s, aliases)}
-    missing = [canon for canon, alist in aliases.items()
-               if canon.lower() not in have
-               and any(phrase_in(t, text_lower) for t in [canon] + list(alist))]
+    candidates = {c.lower(): [c] + list(a) for c, a in aliases.items()}
+    for term in vocab or []:
+        candidates.setdefault(term.lower(), [term])
+    missing = [canon for canon, terms in candidates.items()
+               if canon not in have and not ({t.lower() for t in terms} & have)
+               and any(phrase_in(t.lower(), text_lower) for t in terms)]
     denom = matched_w + UNKNOWN_SKILL_WEIGHT * len(missing)
     if denom == 0:
-        return 0.0, matched, missing
+        return 0.0, matched, missing, None
     coverage = matched_w / denom
     confidence = min(1.0, matched_w / 6)       # ~2 core skills = full confidence
-    return coverage * (0.5 + 0.5 * confidence), matched, missing
+    return coverage * (0.5 + 0.5 * confidence), matched, missing, coverage
 
 
 def _title_tokens(t: str) -> set[str]:
     return {x for x in tokens(t) if x not in _TITLE_NOISE}
 
 
+def _w(tok: str) -> float:
+    return GENERIC_WEIGHT if tok in GENERIC_TITLE_WORDS else 1.0
+
+
 def score_title(profile: Profile, title: str) -> float:
+    """Best weighted overlap with any target title. Generic role words weigh 0.25, so a match
+    needs the distinctive word: 'UI Developer' vs 'BI Developer' = 0.2, 'Data Engineer II' = 1.0."""
     jt = _title_tokens(title)
     best = 0.0
     for target in profile.target_titles:
         tt = _title_tokens(target)
         if tt:
-            best = max(best, len(tt & jt) / len(tt))
+            best = max(best, sum(_w(t) for t in tt & jt) / sum(_w(t) for t in tt))
     return best
 
 
@@ -85,18 +126,63 @@ def job_level(job: Job) -> str | None:
     return None
 
 
-def score_seniority(profile: Profile, job: Job) -> float:
+def _wanted_levels(profile: Profile) -> list[str]:
     wanted = profile.seniority if isinstance(profile.seniority, (list, tuple)) else [profile.seniority]
-    wanted = [w for w in wanted if w in LEVELS] or ["mid"]
-    lvl = job_level(job) or "mid"          # titles without a level word are usually mid-level roles
-    gap = min(abs(LEVELS.index(lvl) - LEVELS.index(w)) for w in wanted)
-    s = {0: 1.0, 1: 0.6}.get(gap, 0.2)
+    return [w for w in wanted if w in LEVELS] or ["mid"]
+
+
+def level_gap(profile: Profile, job: Job) -> int:
+    """Signed distance from your accepted range: +1 = one level above your highest, -1 = below your lowest."""
+    idx = LEVELS.index(job_level(job) or "mid")   # titles without a level word are usually mid-level
+    wanted = [LEVELS.index(w) for w in _wanted_levels(profile)]
+    if idx > max(wanted):
+        return idx - max(wanted)
+    if idx < min(wanted):
+        return idx - min(wanted)
+    return 0
+
+
+def required_years(job: Job) -> int | None:
     years = [int(y) for y in _YEARS.findall(job.description)[:3]]
-    if years and profile.years_experience:
-        need = min(years)
-        if need > profile.years_experience + 1:
-            s *= max(0.2, 1 - 0.15 * (need - profile.years_experience))
+    return min(years) if years else None
+
+
+def score_seniority(profile: Profile, job: Job) -> float:
+    s = {0: 1.0, 1: 0.6}.get(abs(level_gap(profile, job)), 0.2)
+    need = required_years(job)
+    if need is not None and profile.years_experience and need > profile.years_experience + 1:
+        s *= max(0.2, 1 - 0.15 * (need - profile.years_experience))
     return s
+
+
+def fit_tier(profile: Profile, job: Job, title: float, coverage: float | None,
+             fit: dict | None = None) -> tuple[str, list[str]]:
+    """('fit' | 'reach' | 'out', reasons). 'out' listings are left out of the digest."""
+    f = {**DEFAULT_FIT, **(fit or {})}
+    out, reach = [], []
+    if title < f["min_title"]:
+        out.append("not your target role family")
+    if coverage is not None and coverage < f["min_skill_coverage"]:
+        out.append("missing most required skills")
+    elif coverage is not None and coverage < f["reach_skill_coverage"]:
+        reach.append("some required skills you don't list")
+    gap = level_gap(profile, job)
+    if gap > f["max_level_gap_up"]:
+        out.append(f"{job_level(job)} level")
+    elif gap > 0:
+        reach.append(f"{job_level(job)} level")
+    elif gap < 0:
+        out.append(f"{job_level(job)} level (below your range)")
+    need = required_years(job)
+    if need is not None and profile.years_experience:
+        over = need - profile.years_experience
+        if over > f["exclude_years_over"]:
+            out.append(f"asks for {need}+ years")
+        elif over > f["reach_years_over"]:
+            reach.append(f"asks for {need}+ years")
+    if out:
+        return "out", out
+    return ("reach", reach) if reach else ("fit", [])
 
 
 US_STATES = {
@@ -186,20 +272,26 @@ def hard_filter(profile: Profile, job: Job, text_lower: str) -> str | None:
     return None
 
 
-def score_job(profile: Profile, job: Job, weights: dict, aliases: dict) -> MatchResult:
+def score_job(profile: Profile, job: Job, weights: dict, aliases: dict,
+              vocab: list[str] | None = None, fit: dict | None = None) -> MatchResult:
     text_lower = f"{job.title}\n{job.description}\n{' '.join(job.tags)}".lower()
     reason = hard_filter(profile, job, text_lower)
-    skills, matched, missing = score_skills(profile, text_lower, aliases)
+    skills, matched, missing, coverage = score_skills(profile, text_lower, aliases, vocab)
+    title = score_title(profile, job.title)
     profile_text = " ".join([profile.body, profile.ideal_job, *profile.skills, *profile.target_titles])
     breakdown = {
         "skills": skills,
-        "title": score_title(profile, job.title),
+        "title": title,
         "text_similarity": min(1.0, cosine(profile_text, job.description) / 0.35),
         "seniority": score_seniority(profile, job),
         "location": score_location(profile, job),
         "bonus": score_bonus(profile, text_lower),
     }
     total = sum(weights.get(k, 0) * v for k, v in breakdown.items())
+    tier, why = fit_tier(profile, job, title, coverage, fit)
+    if not reason and tier == "out":
+        reason = "out of scope: " + "; ".join(why)
     return MatchResult(job=job, score=0.0 if reason else round(100 * total, 1),
                        breakdown=breakdown, matched_skills=matched,
-                       missing_skills=missing, excluded_reason=reason)
+                       missing_skills=missing, excluded_reason=reason,
+                       tier=tier, tier_reasons=why, raw_score=round(100 * total, 1))
