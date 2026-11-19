@@ -80,3 +80,14 @@ def test_vocab_never_adds_to_score_for_skills_you_have():
     p = prof(skills={**prof().skills, "kafka": 2})
     r = run(p, job(desc="SQL, Python and Kafka."))
     assert "kafka" in r.matched_skills and "kafka" not in r.missing_skills
+
+
+def test_title_needs_all_distinctive_words_and_a_compatible_role():
+    from gighunter.matcher import title_match as tm
+    assert tm("Data Engineer", "Data Scientist, Product Analytics") < 0.5          # role family differs
+    assert tm("Data Platform Engineer", "AI Platform Engineer") < 0.5             # 'data' missing
+    assert tm("Business Intelligence Developer", "Business Intelligence Developer - Navitus") == 1.0
+    assert tm("BI Engineer", "BI Developer") == 1.0                                # Engineer ~ Developer
+    assert tm("Data Warehouse Developer", "Data Warehouse/Microsoft Fabric Engineer") == 1.0
+    assert tm("Database Administrator", "Sr. Database Admin") == 1.0              # Administrator ~ Admin
+    assert tm("Business Intelligence Developer", "Business Intelligence Assistant Manager") < 0.5

@@ -17,7 +17,7 @@ from . import workspace
 from .models import Profile
 
 PREFERENCE_KEYS = {"target_titles", "target_seniority", "work_modes", "locations",
-                   "min_salary_usd", "dealbreakers", "bonus_keywords"}
+                   "min_salary_usd", "dealbreakers", "bonus_keywords", "remote_regions"}
 
 
 def _yaml(p: Path) -> dict:
@@ -128,4 +128,5 @@ def load_profile(about_path: Path | None = None, params_path: Path | None = None
         ideal_job=_strip_todo_lines(ideal),
         raw={"about": about, "params": params},
         skill_context=context,
+        **({"remote_regions": [str(r).lower() for r in prefs["remote_regions"]]} if prefs.get("remote_regions") else {}),
     )

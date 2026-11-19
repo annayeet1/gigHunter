@@ -5,6 +5,8 @@
 # type: lever       -> jobs.lever.co/<company>
 # type: ashby       -> jobs.ashbyhq.com/<company>
 # type: remoteok    -> remoteok.com public JSON API (optional `tags` filter)
+# type: himalayas   -> himalayas.app public remote-jobs API, searched with `queries`
+# type: jobicy      -> jobicy.com public remote-jobs API, searched with `tags` (+ optional geo: usa)
 # type: rss         -> any RSS/Atom job feed (We Work Remotely, Hacker News "who's hiring" mirrors, etc.)
 #
 # Set enabled: false to skip a source without deleting it.

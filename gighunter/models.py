@@ -18,6 +18,7 @@ class Job:
     salary_min: int | None = None
     salary_max: int | None = None
     tags: list[str] = field(default_factory=list)
+    remote_regions: list[str] = field(default_factory=list)   # countries/regions a remote job is limited to; [] = unrestricted/unknown
 
 
 @dataclass
@@ -35,7 +36,8 @@ class Profile:
     body: str                    # aboutme.md free-form markdown (facts)
     ideal_job: str = ""          # JobParams.md free-form markdown (preferences)
     raw: dict = field(default_factory=dict)
-    skill_context: dict[str, list[str]] = field(default_factory=dict)   # skill -> words, one of which must also appear
+    skill_context: dict[str, list[str]] = field(default_factory=dict)
+    remote_regions: list[str] = field(default_factory=lambda: ["united states", "usa", "us", "north america", "americas", "worldwide", "anywhere", "global"])   # skill -> words, one of which must also appear
 
 
 @dataclass

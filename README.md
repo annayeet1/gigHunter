@@ -52,7 +52,8 @@ seniority (10%), location (10%) and bonus keywords (5%). Dealbreakers and below-
 Details are in `gighunter/matcher.py`. Tune it with `/gighunter:tune-score` or `config/settings.yaml`.
 
 ## Job sources
-Only public APIs and feeds: Greenhouse, Lever and Ashby company boards, RemoteOK, and any RSS feed.
+Only public APIs and feeds: Greenhouse, Lever and Ashby company boards, RemoteOK, Himalayas, Jobicy, and any RSS feed.
+Remote listings limited to other countries are filtered by `remote_regions` (JobParams.md; default: US).
 Sites that forbid scraping (LinkedIn, Indeed, Glassdoor) are deliberately not supported.
 
 ## Resume guidelines

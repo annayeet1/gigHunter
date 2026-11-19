@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 
 from ..models import Job
-from . import ashby, greenhouse, lever, remoteok, rss
+from . import ashby, greenhouse, himalayas, jobicy, lever, remoteok, rss
 
 ADAPTERS = {
     "greenhouse": greenhouse.fetch,
@@ -12,6 +12,8 @@ ADAPTERS = {
     "ashby": ashby.fetch,
     "remoteok": remoteok.fetch,
     "rss": rss.fetch,
+    "himalayas": himalayas.fetch,
+    "jobicy": jobicy.fetch,
 }
 log = logging.getLogger(__name__)
 

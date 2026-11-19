@@ -107,16 +107,51 @@ def _w(tok: str) -> float:
     return GENERIC_WEIGHT if tok in GENERIC_TITLE_WORDS else 1.0
 
 
+# Role words that mean the same kind of job. A title only fully matches a target when its role
+# word is in the same family ("Data Scientist" is not a "Data Engineer").
+ROLE_FAMILIES = [
+    {"engineer", "engineering", "developer", "development", "programmer"},
+    {"administrator", "admin"},
+    {"analyst", "specialist"},
+]
+PARTIAL_DISTINCTIVE_CAP = 0.4   # missing one of the target's distinctive words
+ROLE_MISMATCH_FACTOR = 0.5      # different role family
+
+
+def _role_families(toks: set[str]) -> set[int]:
+    fams = set()
+    for t in toks & GENERIC_TITLE_WORDS:
+        idx = next((i for i, f in enumerate(ROLE_FAMILIES) if t in f), None)
+        fams.add(idx if idx is not None else hash(t))
+    return fams
+
+
+def title_match(target: str, title: str) -> float:
+    """Weighted overlap of one target title with a listing title (0..1).
+    - generic role words weigh 0.25, distinctive words 1.0
+    - every distinctive word of the target must appear, else capped at 0.4
+    - the role word must be in the same family (Engineer~Developer), else halved
+    'Data Engineer II' = 1.0 · 'UI Developer' vs 'BI Developer' = 0.2 · 'Data Scientist' vs 'Data Engineer' = 0.4
+    · 'AI Platform Engineer' vs 'Data Platform Engineer' = 0.4"""
+    tt, jt = _title_tokens(target), _title_tokens(title)
+    if not tt:
+        return 0.0
+    have_roles = _role_families(jt)
+    # a target role word is satisfied by any word of the same family ('Developer' for 'Engineer')
+    matched = sum(_w(t) for t in tt if t in jt or (t in GENERIC_TITLE_WORDS and _role_families({t}) & have_roles))
+    s = matched / sum(_w(t) for t in tt)
+    distinctive = tt - GENERIC_TITLE_WORDS
+    if distinctive and not distinctive <= jt:
+        s = min(s, PARTIAL_DISTINCTIVE_CAP)
+    want_roles = _role_families(tt)
+    if want_roles and not (want_roles & have_roles):
+        s *= ROLE_MISMATCH_FACTOR
+    return s
+
+
 def score_title(profile: Profile, title: str) -> float:
-    """Best weighted overlap with any target title. Generic role words weigh 0.25, so a match
-    needs the distinctive word: 'UI Developer' vs 'BI Developer' = 0.2, 'Data Engineer II' = 1.0."""
-    jt = _title_tokens(title)
-    best = 0.0
-    for target in profile.target_titles:
-        tt = _title_tokens(target)
-        if tt:
-            best = max(best, sum(_w(t) for t in tt & jt) / sum(_w(t) for t in tt))
-    return best
+    """Best title_match over your target titles."""
+    return max((title_match(t, title) for t in profile.target_titles), default=0.0)
 
 
 def job_level(job: Job) -> str | None:
@@ -166,6 +201,8 @@ def fit_tier(profile: Profile, job: Job, title: float, coverage: float | None,
         out.append("missing most required skills")
     elif coverage is not None and coverage < f["reach_skill_coverage"]:
         reach.append("some required skills you don't list")
+    if job.remote is not False and job.remote_regions and not remote_eligible(profile, job):
+        out.append("remote only in " + ", ".join(job.remote_regions[:3]))
     gap = level_gap(profile, job)
     if gap > f["max_level_gap_up"]:
         out.append(f"{job_level(job)} level")
@@ -241,12 +278,20 @@ def location_matches(want: str, location: str) -> bool:
     return True
 
 
+def remote_eligible(profile: Profile, job: Job) -> bool:
+    """A remote job limited to specific countries/regions is only open to you if one of them is yours."""
+    if not job.remote_regions:
+        return True
+    mine = [r.lower() for r in getattr(profile, "remote_regions", []) or []]
+    return any(phrase_in(m_, r.lower()) or phrase_in(r.lower(), m_) for r in job.remote_regions for m_ in mine)
+
+
 def score_location(profile: Profile, job: Job) -> float:
     raw = job.location or ""
     loc = raw.lower()
     remote = job.remote if job.remote is not None else ("remote" in loc or "anywhere" in loc)
     if remote and "remote" in profile.work_modes:
-        return 1.0
+        return 1.0 if remote_eligible(profile, job) else 0.0
     if not loc:
         return 0.5
     if {"hybrid", "onsite"} & set(profile.work_modes):
